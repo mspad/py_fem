@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Callable
 from scipy.sparse import csr_matrix, lil_matrix
 from abc import ABC, abstractmethod
 from py_fem.core.mesh import Mesh
@@ -63,14 +64,14 @@ class P1Triangle(Element):
                 A_k[i, j] = np.dot(grad_phi[i], np.matmul(np.matmul(B_inv , B_inv.T), grad_phi[j].T)) * det_B / 2
         return A_k + A_k.T - np.diag(np.diag(A_k))
     
-    def compute_local_forcing(self, element_coords: np.ndarray, f: callable) -> np.ndarray:
+    def compute_local_forcing(self, element_coords: np.ndarray, f: Callable[[float, float], float]) -> np.ndarray:
         """Compute local contribute of the forcing term
 
         Parameters
         ----------
         element_coords : np.ndarray
             Triangular element vertices coordinates
-        f : callable
+        f : Callable[[float, float], float]
             forcing term as lambda function
 
         Returns
@@ -131,18 +132,17 @@ def assemble_global_stiffness(mesh: Mesh) -> lil_matrix:
             for j in range(3):
                 J = elem[j]
                 A_global[I, J] += A_local[i, j]
-    # return A_global.tocsr()
     return A_global
 
 
-def assemble_global_forcing(mesh: Mesh, f: callable) -> np.ndarray:
+def assemble_global_forcing(mesh: Mesh, f: Callable[[float, float], float]) -> np.ndarray:
     """Assemble global forcing term
 
     Parameters
     ----------
     mesh : Mesh
         Mesh object
-    f : callable
+    f : Callable[[float, float], float]
         forcing as lambda function
 
     Returns

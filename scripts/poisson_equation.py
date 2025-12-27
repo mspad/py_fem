@@ -1,11 +1,21 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from py_fem.core.mesh import Mesh
-from py_fem.core.boundary_conditions import apply_dirichlet_bcs
+from py_fem.utilities.solvers import poisson_solver
 from py_fem.utilities.plot import plot_solution_2d
-from py_fem.core.assemble import assemble_global_forcing, assemble_global_stiffness
 from py_fem.utilities.error_norm import compute_L2_error
-from scipy.sparse.linalg import cg
+import logging
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s  %(levelname)s - %(message)s',
+    handlers=[
+        # logging.FileHandler('app.log'),  # Log to a file
+        logging.StreamHandler()  # Also log to console
+    ]
+)
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     f = lambda x, y: 2 * np.pi ** 2 * np.sin(np.pi * x) * np.sin(np.pi * y)
@@ -18,28 +28,17 @@ if __name__ == "__main__":
     h_squared = [1 / n ** 2 for n in n_ref]
 
     for n in n_ref:
-        print("-------------------------")
         mesh = Mesh.unit_square(nx = n, ny = n, element_type = "P1")
-        print("Assembling lhs and rhs...")
-        A = assemble_global_stiffness(mesh)
-        print("A shape: ", A.get_shape(),)
-        print("Nonzero entries over total entries:", A.count_nonzero(), "/", A.get_shape()[0] ** 2, "(", 100 * A.count_nonzero()/A.get_shape()[0] ** 2, "%)")
-        F = assemble_global_forcing(mesh, f)
-        dirichlet_bc = u_analytical(mesh.nodes[mesh.boundary_nodes][:, 0], mesh.nodes[mesh.boundary_nodes][:, 1])
-        A, F = apply_dirichlet_bcs(A, F, mesh.boundary_nodes, dirichlet_bc)
-        print("Solving the linear system Ax = F...")
-        A.tocsr()
-        uh, info = cg(A, F)
-        if info == 0:
-            print("Conjugate gradient successfully converged")
-        else:
-            print("Convergence not achieved")
+        uh, A, F = poisson_solver(mesh=mesh,
+                                  forcing_term_expression=f,
+                                  dirichlet_bcs_expression=u_analytical,
+                                  display_info=True)
         x = mesh.nodes[:, 0]
         y = mesh.nodes[:, 1]
         u_exact = u_analytical(x, y)
         error.append(compute_L2_error(mesh, uh, u_exact))
-        print("L2 norm of the error =", error[-1])
-        print("-------------------------")
+        logger.info(f"L2 norm of the error: {error[-1]}")
+   
     
     fig, axs = plt.subplots(nrows = 2, ncols = 2, figsize = (8, 8))
     axs[0, 0].loglog(h, error, '-o', label = "$L^2$ norm of the error")
@@ -55,3 +54,5 @@ if __name__ == "__main__":
     axs[1, 0].set_xticks([])
     axs[1, 0].set_yticks([])
     plt.show()
+
+
